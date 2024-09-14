@@ -59,15 +59,22 @@ const TodoList = () => {
     const toggleComplete = async (id: number, completed: boolean) => {
         if (loadingTodos.includes(id)) return;
         setLoadingTodos(prev => [...prev, id]);
+        // Update the state locally first
+        setTodos(prevTodos => prevTodos.map(todo => 
+            todo.id === id ? { ...todo, completed: !completed } : todo
+        ));
         try {
             await fetch('/api/todos', {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({id, completed: !completed}),
             });
-            await fetchTodos();
             toast.success('Todo updated successfully');
         } catch(error) {
+            // Revert the change if the API call fails
+            setTodos(prevTodos => prevTodos.map(todo => 
+                todo.id === id ? { ...todo, completed: completed } : todo
+            ));
             toast.error('Failed to update todo');
         } finally {
             setLoadingTodos(prev => prev.filter(todoId => todoId !== id));
@@ -77,15 +84,21 @@ const TodoList = () => {
     const deleteTodo = async (id: number) => {
         if (loadingTodos.includes(id)) return;
         setLoadingTodos(prev => [...prev, id]);
+        // Remove the todo from the state locally first
+        const removedTodo = todos.find(todo => todo.id === id);
+        setTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
         try {
             await fetch('/api/todos', {
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({id}),
             });
-            await fetchTodos();
             toast.success('Todo deleted successfully');
         } catch(error) {
+            // Add the todo back if the API call fails
+            if (removedTodo) {
+                setTodos(prevTodos => [...prevTodos, removedTodo]);
+            }
             toast.error('Failed to delete todo');
         } finally {
             setLoadingTodos(prev => prev.filter(todoId => todoId !== id));
