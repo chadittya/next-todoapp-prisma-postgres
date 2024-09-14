@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import toast, { Toaster } from 'react-hot-toast';
+import { ClipLoader } from 'react-spinners';
 
 interface Todo {
     id: number;
@@ -14,15 +15,24 @@ const TodoList = () => {
     const [newTask, setNewTask] = useState<string>('');
     const [isAdding, setIsAdding] = useState<boolean>(false);
     const [loadingTodos, setLoadingTodos] = useState<number[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     useEffect(()=>{
         fetchTodos();
     },[])
 
     const fetchTodos = async () => {
+        setIsLoading(true);
+        try{
         const response = await fetch('/api/todos');
         const data = await response.json();
         setTodos(data);
+        } catch(error){
+            console.error('Error fetching todos', error);
+            toast.error('Failed to fetch todos');
+        } finally {
+            setIsLoading(false);
+        }
     }
 
     const addTodo = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -102,29 +112,35 @@ const TodoList = () => {
           {isAdding ? 'Adding...' : 'Add Task'}
         </button>
       </form>
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo.id} className="flex items-center justify-between p-2 border-b">
-            <span className={todo.completed ? 'line-through' : ''}>{todo.task}</span>
-            <div>
-              <button
-                onClick={() => toggleComplete(todo.id, todo.completed)}
-                className="mr-2 p-1 bg-green-500 text-white rounded disabled:bg-green-300"
-                disabled={loadingTodos.includes(todo.id)}
-              >
-                {loadingTodos.includes(todo.id) ? 'Updating...' : (todo.completed ? 'Undo' : 'Complete')}
-              </button>
-              <button
-                onClick={() => deleteTodo(todo.id)}
-                className="p-1 bg-red-500 text-white rounded disabled:bg-red-300"
-                disabled={loadingTodos.includes(todo.id)}
-              >
-                {loadingTodos.includes(todo.id) ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {isLoading ? (
+        <div className="flex justify-center items-center h-40">
+          <ClipLoader color="#3B82F6" size={50} />
+        </div>
+      ) : (
+        <ul>
+          {todos.map((todo) => (
+            <li key={todo.id} className="flex items-center justify-between p-2 border-b">
+              <span className={todo.completed ? 'line-through' : ''}>{todo.task}</span>
+              <div>
+                <button
+                  onClick={() => toggleComplete(todo.id, todo.completed)}
+                  className="mr-2 p-1 bg-green-500 text-white rounded disabled:bg-green-300"
+                  disabled={loadingTodos.includes(todo.id)}
+                >
+                  {loadingTodos.includes(todo.id) ? 'Updating...' : (todo.completed ? 'Undo' : 'Complete')}
+                </button>
+                <button
+                  onClick={() => deleteTodo(todo.id)}
+                  className="p-1 bg-red-500 text-white rounded disabled:bg-red-300"
+                  disabled={loadingTodos.includes(todo.id)}
+                >
+                  {loadingTodos.includes(todo.id) ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
