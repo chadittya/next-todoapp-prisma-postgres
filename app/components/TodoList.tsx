@@ -12,6 +12,8 @@ interface Todo {
 const TodoList = () => {
     const [todos, setTodos] = useState<Todo[]>([]);
     const [newTask, setNewTask] = useState<string>('');
+    const [isAdding, setIsAdding] = useState<boolean>(false);
+    const [loadingTodos, setLoadingTodos] = useState<number[]>([]);
 
     useEffect(()=>{
         fetchTodos();
@@ -25,47 +27,58 @@ const TodoList = () => {
 
     const addTodo = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (!newTask.trim()) return; //if the task is empty, return
-        try{
-        const response = await fetch('/api/todos', {
-            method: 'POST', //POST request to create a new todo
-            headers: {'Content-Type': 'application/json'}, //set the content type to JSON
-            body: JSON.stringify({task: newTask}), //stringify the new task
-        })
-        const data = await response.json(); //parse the response as JSON
-        setTodos([data, ...todos]); //update the state with the new todo
-        setNewTask(''); //clear the input field
-        toast.success('Todo added successfully');
-        }catch(error){
+        if (!newTask.trim() || isAdding) return; 
+        setIsAdding(true);
+        try {
+            const response = await fetch('/api/todos', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({task: newTask}),
+            });
+            const data = await response.json();
+            setTodos([data, ...todos]);
+            setNewTask('');
+            toast.success('Todo added successfully');
+        } catch(error) {
             toast.error('Failed to add todo');
+        } finally {
+            setIsAdding(false);
         }
     }
 
-    const toggleComplete = async (id:number, completed:boolean) =>{
-        try{
-        await fetch('/api/todos', {
-            method: 'PUT', //PUT request to update a todo
-            headers: {'Content-Type': 'application/json'}, //set the content type to JSON
-            body: JSON.stringify({id, completed:!completed}),//stringify the id and completed status
-        })
-        fetchTodos(); //fetch the updated todos
-        toast.success('Todo completed successfully');
-        }catch(error){
-            toast.error('Failed to complete todo');
+    const toggleComplete = async (id: number, completed: boolean) => {
+        if (loadingTodos.includes(id)) return;
+        setLoadingTodos(prev => [...prev, id]);
+        try {
+            await fetch('/api/todos', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id, completed: !completed}),
+            });
+            await fetchTodos();
+            toast.success('Todo updated successfully');
+        } catch(error) {
+            toast.error('Failed to update todo');
+        } finally {
+            setLoadingTodos(prev => prev.filter(todoId => todoId !== id));
         }
     }
 
-    const deleteTodo = async (id:number) => {
-        try{
-        await fetch('/api/todos', {
-            method: 'DELETE',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({id}),
-        })
-        fetchTodos();
-        toast.success('Todo deleted successfully');
-        }catch(error){
+    const deleteTodo = async (id: number) => {
+        if (loadingTodos.includes(id)) return;
+        setLoadingTodos(prev => [...prev, id]);
+        try {
+            await fetch('/api/todos', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id}),
+            });
+            await fetchTodos();
+            toast.success('Todo deleted successfully');
+        } catch(error) {
             toast.error('Failed to delete todo');
+        } finally {
+            setLoadingTodos(prev => prev.filter(todoId => todoId !== id));
         }
     }
 
@@ -79,9 +92,14 @@ const TodoList = () => {
           onChange={(e) => setNewTask(e.target.value)}
           placeholder="Add a new task"
           className="flex-grow p-2 border rounded-l text-black"
+          disabled={isAdding}
         />
-        <button type="submit" className="p-2 bg-blue-500 text-white rounded-r">
-          Add Task
+        <button 
+          type="submit" 
+          className="p-2 bg-blue-500 text-white rounded-r disabled:bg-blue-300"
+          disabled={isAdding}
+        >
+          {isAdding ? 'Adding...' : 'Add Task'}
         </button>
       </form>
       <ul>
@@ -91,15 +109,17 @@ const TodoList = () => {
             <div>
               <button
                 onClick={() => toggleComplete(todo.id, todo.completed)}
-                className="mr-2 p-1 bg-green-500 text-white rounded"
+                className="mr-2 p-1 bg-green-500 text-white rounded disabled:bg-green-300"
+                disabled={loadingTodos.includes(todo.id)}
               >
-                {todo.completed ? 'Undo' : 'Complete'}
+                {loadingTodos.includes(todo.id) ? 'Updating...' : (todo.completed ? 'Undo' : 'Complete')}
               </button>
               <button
                 onClick={() => deleteTodo(todo.id)}
-                className="p-1 bg-red-500 text-white rounded"
+                className="p-1 bg-red-500 text-white rounded disabled:bg-red-300"
+                disabled={loadingTodos.includes(todo.id)}
               >
-                Delete
+                {loadingTodos.includes(todo.id) ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </li>
